@@ -5,7 +5,12 @@ const app = express();
 require("dotenv").config();
 
 const PORT = process.env.PORT || 4000;
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true, // If needed for cookies
+  })
+);
 
 app.get("/", (req, res) => {
   res.send(`<h1>This is my OAuth app</h1>`);
@@ -32,11 +37,13 @@ app.get("/auth/github/callback", async (req, res) => {
       {
         headers: {
           Accept: "application/json",
+          "Content-Type": "application/json",
         },
       }
     );
+    console.log("GitHub Token Response:", tokenResponse.data);
 
-    const accessToken = await tokenResponse.data.access_token;
+    const accessToken = tokenResponse.data.access_token;
     console.log(accessToken);
     res.cookie("accessToken", accessToken);
 
