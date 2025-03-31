@@ -2,7 +2,10 @@ const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
 const app = express();
+const { setSecureCookie } = require("./services/cookie.js");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
+const { validateAccessToken } = require("./middleware/validateToken.js");
 
 const PORT = process.env.PORT || 4000;
 app.use(
@@ -11,9 +14,30 @@ app.use(
     credentials: true, // If needed for cookies
   })
 );
+app.use(cookieParser());
 
 app.get("/", (req, res) => {
   res.send(`<h1>This is my OAuth app</h1>`);
+});
+
+app.get("/user/profile/github", validateAccessToken, async (req, res) => {
+  const { access_token } = req.cookies;
+  try {
+    const githubUserDataResponse = await axios.get(
+      `https://api.github.com/user`,
+      {
+        headers: {
+          Authorization: `bearer ${access_token}`,
+        },
+      }
+    );
+
+    res.json({ user: githubUserDataResponse.data });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ error: "Could not fetch user github profile" });
+  }
 });
 
 app.get("/auth/github", (req, res) => {
@@ -45,11 +69,33 @@ app.get("/auth/github/callback", async (req, res) => {
 
     const accessToken = tokenResponse.data.access_token;
     console.log(accessToken);
-    res.cookie("accessToken", accessToken);
+    res.cookie("access_token", accessToken);
 
-    return res.redirect(`${process.env.FRONTEND_URL}/v1/profile/github`);
+    return res.redirect(`${process.env.FRONTEND_URL}/v2/profile/github`);
   } catch (error) {
     return res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/user/profile/google", validateAccessToken, async (req, res) => {
+  const { access_token } = req.cookies;
+  try {
+    console.log("came here");
+    const googleUserDataResponse = await axios.get(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      {
+        headers: {
+          Authorization: `bearer ${access_token}`,
+        },
+      }
+    );
+    console.log(googleUserDataResponse.data);
+
+    res.json({ user: googleUserDataResponse.data });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ error: "Could not fetch user google profile" });
   }
 });
 
@@ -83,8 +129,8 @@ app.get("/auth/google/callback", async (req, res) => {
     const accessToken = tokenResponse.data.access_token;
     console.log(accessToken);
 
-    res.cookie("access_token", accessToken);
-    return res.redirect(`${process.env.FRONTEND_URL}/v1/profile/google`);
+    setSecureCookie(res, accessToken);
+    return res.redirect(`${process.env.FRONTEND_URL}/v2/profile/google`);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
